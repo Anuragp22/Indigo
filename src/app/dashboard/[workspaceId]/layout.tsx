@@ -11,13 +11,15 @@ import {
     HydrationBoundary,
     dehydrate,
 } from '@tanstack/react-query'
+import Sidebar from '@/components/global/sidebar'
 
 type Props = {
     params: { workspaceId: string }
     children: React.ReactNode
 }
 
-const Layout = async ({ params: { workspaceId }, children }: Props) => {
+const Layout = async ({ params, children }: Props) => {
+    const { workspaceId } = await params;
     const auth = await onAuthenticateUser()
     if (!auth.user?.workspace) redirect('/auth/sign-in')
     if (!auth.user?.workspace?.length) redirect('/auth/sign-in')
@@ -29,8 +31,6 @@ const Layout = async ({ params: { workspaceId }, children }: Props) => {
     if (!hasAccess.data?.workspace) return null
 
     const query = new QueryClient()
-
-
 
     await query.prefetchQuery({
         queryKey: ['workspace-folders'],
@@ -54,9 +54,9 @@ const Layout = async ({ params: { workspaceId }, children }: Props) => {
     return (
         <HydrationBoundary state={dehydrate(query)}>
             <div className="flex h-screen w-screen">
-
+                <Sidebar activeWorkspaceId={workspaceId} />
                 <div className="w-full pt-28 p-6 overflow-y-scroll overflow-x-hidden">
-
+                    {/* <GlobalHeader workspace={hasAccess.data.workspace} /> */}
                     <div className="mt-4">{children}</div>
                 </div>
             </div>

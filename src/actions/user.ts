@@ -2,11 +2,37 @@
 
 import { client } from '@/lib/prisma';
 import { currentUser } from '@clerk/nextjs/server';
+import nodemailer from 'nodemailer';
+
+export const sendEmail = async (
+  to: string,
+  subject: string,
+  text: string,
+  html?: string
+) => {
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.MAILER_EMAIL,
+      pass: process.env.MAILER_PASSWORD,
+    },
+  });
+
+  const mailOptions = {
+    to,
+    subject,
+    text,
+    html,
+  };
+  return { transporter, mailOptions };
+};
 
 export const onAuthenticateUser = async () => {
   try {
     // Log to see when the function starts
-    console.log('🟢 Starting authentication process');
+    // console.log('🟢 Starting authentication process');
 
     // Retrieve the current user
     const user = await currentUser();
@@ -14,7 +40,7 @@ export const onAuthenticateUser = async () => {
       console.log('🔴 No user found. Returning 403 status.');
       return { status: 403 };
     }
-    console.log('🟢 Current user retrieved:', user);
+    // console.log('🟢 Current user retrieved:', user);
 
     // Check if the user already exists in the database
     const userExist = await client.user.findUnique({
@@ -33,7 +59,7 @@ export const onAuthenticateUser = async () => {
     });
 
     if (userExist) {
-      console.log('🟢 User already exists in the database:', userExist);
+      // console.log('🟢 User already exists in the database:', userExist);
       return { status: 200, user: userExist };
     }
 
@@ -94,22 +120,141 @@ export const getNotifications = async () => {
     const user = await currentUser();
     if (!user) return { status: 404 };
     const notifications = await client.user.findUnique({
-      where: { clerkid: user.id },
+      where: {
+        clerkid: user.id,
+      },
       select: {
-        notifications: true,
+        notification: true,
         _count: {
           select: {
-            notifications: true,
+            notification: true,
           },
         },
       },
     });
 
-    if (notifications && notifications.notifications.length > 0) {
+    if (notifications && notifications.notification.length > 0)
       return { status: 200, data: notifications };
-    }
     return { status: 404, data: [] };
   } catch (error) {
-    return { status: 404, data: [] };
+    return { status: 400, data: [] };
+  }
+};
+
+export const searchUsers = async (query: string) => {
+  try {
+    const user = await currentUser();
+    if (!user) return { status: 404 };
+
+    const users = await client.user.findMany({
+      where: {
+        OR: [
+          { firstname: { contains: query } },
+          { email: { contains: query } },
+          { lastname: { contains: query } },
+        ],
+        NOT: [{ clerkid: user.id }],
+      },
+      select: {
+        id: true,
+        subscription: {
+          select: {
+            plan: true,
+          },
+        },
+        firstname: true,
+        lastname: true,
+        image: true,
+        email: true,
+      },
+    });
+
+    if (users && users.length > 0) {
+      return { status: 200, data: users };
+    }
+
+    return { status: 404, data: undefined };
+  } catch (error) {
+    return { status: 500, data: undefined };
+  }
+};
+
+export const inviteMembers = async (
+  workspaceId: string,
+  recieverId: string,
+  email: string
+) => {
+  try {
+    const user = await currentUser();
+    if (!user) return { status: 404 };
+    const senderInfo = await client.user.findUnique({
+      where: {
+        clerkid: user.id,
+      },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+      },
+    });
+    if (senderInfo?.id) {
+      const workspace = await client.workSpace.findUnique({
+        where: {
+          id: workspaceId,
+        },
+        select: {
+          name: true,
+        },
+      });
+      if (workspace) {
+        const invitation = await client.invite.create({
+          data: {
+            senderId: senderInfo.id,
+            recieverId,
+            workSpaceId: workspaceId,
+            content: `You are invited to join ${workspace.name} Workspace, click accept to confirm`,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        await client.user.update({
+          where: {
+            clerkid: user.id,
+          },
+          data: {
+            notification: {
+              create: {
+                content: `${user.firstName} ${user.lastName} invited ${senderInfo.firstname} into ${workspace.name}`,
+              },
+            },
+          },
+        });
+        if (invitation) {
+          const { transporter, mailOptions } = await sendEmail(
+            email,
+            'You got an invitation',
+            'You are invited to join ${workspace.name} Workspace, click accept to confirm',
+            `<a href="${process.env.NEXT_PUBLIC_HOST_URL}/invite/${invitation.id}" style="background-color: #000; padding: 5px 10px; border-radius: 10px;">Accept Invite</a>`
+          );
+
+          transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+              console.log('🔴', error.message);
+            } else {
+              console.log('✅ Email send');
+            }
+          });
+          return { status: 200, data: 'Invite sent' };
+        }
+        return { status: 400, data: 'invitation failed' };
+      }
+      return { status: 404, data: 'workspace not found' };
+    }
+    return { status: 404, data: 'recipient not found' };
+  } catch (error) {
+    console.log(error);
+    return { status: 400, data: 'Oops! something went wrong' };
   }
 };

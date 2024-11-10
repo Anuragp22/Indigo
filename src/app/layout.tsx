@@ -3,6 +3,7 @@ import "./globals.css";
 import { Manrope, DM_Sans } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { ThemeProvider } from "@/components/theme"
+import ReactQueryProvider from "@/react-query";
 
 const manrope = DM_Sans({ subsets: ['latin'] })
 export const metadata: Metadata = {
@@ -25,7 +26,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
+            <ReactQueryProvider>
+              {children}
+            </ReactQueryProvider>
           </ThemeProvider>
         </body>
       </html>
