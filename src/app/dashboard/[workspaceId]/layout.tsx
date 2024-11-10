@@ -3,16 +3,12 @@ import { getAllUserVideos, getWorkspaceFolders, getWorkSpaces, verifyAccessToWor
 import { redirect } from 'next/navigation'
 import React from 'react'
 import {
-    useQuery,
-    useMutation,
-    useQueryClient,
     QueryClient,
-    QueryClientProvider,
     HydrationBoundary,
     dehydrate,
 } from '@tanstack/react-query'
 import Sidebar from '@/components/global/sidebar'
-
+import GlobalHeader from '@/components/global/globar-header'
 type Props = {
     params: { workspaceId: string }
     children: React.ReactNode
@@ -56,7 +52,7 @@ const Layout = async ({ params, children }: Props) => {
             <div className="flex h-screen w-screen">
                 <Sidebar activeWorkspaceId={workspaceId} />
                 <div className="w-full pt-28 p-6 overflow-y-scroll overflow-x-hidden">
-                    {/* <GlobalHeader workspace={hasAccess.data.workspace} /> */}
+                    <GlobalHeader workspace={hasAccess.data.workspace} />
                     <div className="mt-4">{children}</div>
                 </div>
             </div>

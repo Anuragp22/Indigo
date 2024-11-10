@@ -203,7 +203,7 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
             )}
         </div>
     )
-    return <div className='w-full'>
+    return <div className='full'>
         <InfoBar />
         <div className="md:hidden fixed my-4">
             <Sheet>
