@@ -1,5 +1,4 @@
 'use client'
-
 import { getWorkSpaces } from '@/actions/workspace'
 import {
     Select,
@@ -10,37 +9,40 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import Search from '../search'
 import { Separator } from '@/components/ui/separator'
-import { useQueryData } from '@/hooks/useQueryData'
+
 import { NotificationProps, WorkspaceProps } from '@/types/index.type'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import React from 'react'
-import Modal from '../Modal'
+import Modal from '../modal'
 import { Menu, PlusCircle } from 'lucide-react'
+import Search from '../search'
 import { MENU_ITEMS } from '@/constants'
-import SidebarMenuItem from './sidebar-item'
-import { getNotifications } from '@/actions/user'
 import SidebarItem from './sidebar-item'
+import { getNotifications } from '@/actions/user'
+import { useQueryData } from '@/hooks/useQueryData'
 import WorkspacePlaceholder from './workspace-placeholder'
 import GlobalCard from '../global-card'
-import PaymentButton from '@/components/global/payment-button'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+// import Loader from '../loader'
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import InfoBar from '../info-bar'
+// import { useDispatch } from 'react-redux'
+// import { WORKSPACES } from '@/redux/slices/workspaces'
+import PaymentButton from '../payment-button'
 type Props = {
     activeWorkspaceId: string
 }
 
 const Sidebar = ({ activeWorkspaceId }: Props) => {
 
-
-    const menuItems = MENU_ITEMS(activeWorkspaceId)
     const router = useRouter()
     const pathName = usePathname()
+    // const dispatch = useDispatch()
 
     const { data, isFetched } = useQueryData(['user-workspaces'], getWorkSpaces)
+    const menuItems = MENU_ITEMS(activeWorkspaceId)
 
     const { data: notifications } = useQueryData(
         ['user-notifications'],
@@ -48,19 +50,19 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
     )
 
     const { data: workspace } = data as WorkspaceProps
-
-
-
     const { data: count } = notifications as NotificationProps
-
-
-    const currentWorkspace = workspace.workspace.find(
-        (s) => s.id === activeWorkspaceId
-    )
 
     const onChangeActiveWorkspace = (value: string) => {
         router.push(`/dashboard/${value}`)
     }
+    const currentWorkspace = workspace.workspace.find(
+        (s) => s.id === activeWorkspaceId
+    )
+
+    // if (isFetched && workspace) {
+    //     dispatch(WORKSPACES({ workspaces: workspace.workspace }))
+    // }
+
     const SidebarSection = (
         <div className="bg-[#111111] flex-none relative p-4 h-full w-[250px] flex flex-col gap-4 items-center overflow-hidden">
             <div className="bg-[#111111] p-4 flex gap-2 justify-center items-center mb-4 absolute top-0 left-0 right-0 ">
@@ -81,26 +83,28 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
                 </SelectTrigger>
                 <SelectContent className="bg-[#111111] backdrop-blur-xl">
                     <SelectGroup>
-                        <SelectLabel>Workspaces
-                            <Separator />
-                            {workspace?.workspace.map((workspace) => (
-                                <SelectItem
-                                    key={workspace.id}
-                                    value={workspace.id}
-                                >
-                                    {workspace.name}
-                                </SelectItem>
-                            ))}
-                            {workspace.members.length > 0 && workspace.members.map((member) => member.WorkSpace && (
-                                <SelectItem
-                                    key={member.WorkSpace.id}
-                                    value={member.WorkSpace.id}
-                                >
-                                    {member.WorkSpace.name}
-                                </SelectItem>
-                            ))}
-
-                        </SelectLabel>
+                        <SelectLabel>Workspaces</SelectLabel>
+                        <Separator />
+                        {workspace.workspace.map((workspace) => (
+                            <SelectItem
+                                value={workspace.id}
+                                key={workspace.id}
+                            >
+                                {workspace.name}
+                            </SelectItem>
+                        ))}
+                        {workspace.members.length > 0 &&
+                            workspace.members.map(
+                                (workspace) =>
+                                    workspace.WorkSpace && (
+                                        <SelectItem
+                                            value={workspace.WorkSpace.id}
+                                            key={workspace.WorkSpace.id}
+                                        >
+                                            {workspace.WorkSpace.name}
+                                        </SelectItem>
+                                    )
+                            )}
                     </SelectGroup>
                 </SelectContent>
             </Select>
@@ -124,10 +128,11 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
                         <Search workspaceId={activeWorkspaceId} />
                     </Modal>
                 )}
+            <p className="w-full text-[#9D9D9D] font-bold mt-4">Menu</p>
             <nav className="w-full">
                 <ul>
                     {menuItems.map((item) => (
-                        <SidebarMenuItem
+                        <SidebarItem
                             href={item.href}
                             icon={item.icon}
                             selected={pathName === item.href}
@@ -203,31 +208,33 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
             )}
         </div>
     )
-    return <div className='full'>
-        <InfoBar />
-        <div className="md:hidden fixed my-4">
-            <Sheet>
-                <SheetTrigger
-                    asChild
-                    className="ml-2"
-                >
-                    <Button
-                        variant={'ghost'}
-                        className="mt-[2px]"
+    return (
+        <div className="full">
+            <InfoBar />
+            <div className="md:hidden fixed my-4">
+                <Sheet>
+                    <SheetTrigger
+                        asChild
+                        className="ml-2"
                     >
-                        <Menu />
-                    </Button>
-                </SheetTrigger>
-                <SheetContent
-                    side={'left'}
-                    className="p-0 w-fit h-full"
-                >
-                    {SidebarSection}
-                </SheetContent>
-            </Sheet>
+                        <Button
+                            variant={'ghost'}
+                            className="mt-[2px]"
+                        >
+                            <Menu />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent
+                        side={'left'}
+                        className="p-0 w-fit h-full"
+                    >
+                        {SidebarSection}
+                    </SheetContent>
+                </Sheet>
+            </div>
+            <div className="md:block hidden h-full">{SidebarSection}</div>
         </div>
-        <div className="md:block hidden h-full">{SidebarSection}</div>
-    </div>
+    )
 }
 
 export default Sidebar
