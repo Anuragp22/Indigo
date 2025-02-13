@@ -3,6 +3,9 @@
 import { client } from '@/lib/prisma';
 import { currentUser } from '@clerk/nextjs/server';
 import nodemailer from 'nodemailer';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_CLIENT_SECRET as string);
 
 export const sendEmail = async (
   to: string,
@@ -31,18 +34,11 @@ export const sendEmail = async (
 
 export const onAuthenticateUser = async () => {
   try {
-    // Log to see when the function starts
-    // console.log('🟢 Starting authentication process');
-
-    // Retrieve the current user
     const user = await currentUser();
     if (!user) {
-      console.log('🔴 No user found. Returning 403 status.');
       return { status: 403 };
     }
-    // console.log('🟢 Current user retrieved:', user);
 
-    // Check if the user already exists in the database
     const userExist = await client.user.findUnique({
       where: {
         clerkid: user.id,
@@ -57,14 +53,10 @@ export const onAuthenticateUser = async () => {
         },
       },
     });
-
     if (userExist) {
-      // console.log('🟢 User already exists in the database:', userExist);
       return { status: 200, user: userExist };
     }
 
-    // If user doesn't exist, create a new user
-    console.log('🔵 User not found in database. Creating new user...');
     const newUser = await client.user.create({
       data: {
         clerkid: user.id,
@@ -100,17 +92,12 @@ export const onAuthenticateUser = async () => {
         },
       },
     });
-
     if (newUser) {
-      console.log('🟢 New user created successfully:', newUser);
       return { status: 201, user: newUser };
     }
-
-    // If something went wrong with the creation process
-    console.log('🔴 Failed to create new user. Returning 400 status.');
     return { status: 400 };
   } catch (error) {
-    console.log('🔴 ERROR during authentication process:', error);
+    console.log('🔴 ERROR', error);
     return { status: 500 };
   }
 };
@@ -179,83 +166,70 @@ export const searchUsers = async (query: string) => {
   }
 };
 
-export const inviteMembers = async (
-  workspaceId: string,
-  recieverId: string,
-  email: string
-) => {
+export const getPaymentInfo = async () => {
   try {
     const user = await currentUser();
     if (!user) return { status: 404 };
-    const senderInfo = await client.user.findUnique({
+
+    const payment = await client.user.findUnique({
       where: {
         clerkid: user.id,
       },
       select: {
-        id: true,
-        firstname: true,
-        lastname: true,
+        subscription: {
+          select: { plan: true },
+        },
       },
     });
-    if (senderInfo?.id) {
-      const workspace = await client.workSpace.findUnique({
-        where: {
-          id: workspaceId,
-        },
-        select: {
-          name: true,
-        },
-      });
-      if (workspace) {
-        const invitation = await client.invite.create({
-          data: {
-            senderId: senderInfo.id,
-            recieverId,
-            workSpaceId: workspaceId,
-            content: `You are invited to join ${workspace.name} Workspace, click accept to confirm`,
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        await client.user.update({
-          where: {
-            clerkid: user.id,
-          },
-          data: {
-            notification: {
-              create: {
-                content: `${user.firstName} ${user.lastName} invited ${senderInfo.firstname} into ${workspace.name}`,
-              },
-            },
-          },
-        });
-        if (invitation) {
-          const { transporter, mailOptions } = await sendEmail(
-            email,
-            'You got an invitation',
-            'You are invited to join ${workspace.name} Workspace, click accept to confirm',
-            `<a href="${process.env.NEXT_PUBLIC_HOST_URL}/invite/${invitation.id}" style="background-color: #000; padding: 5px 10px; border-radius: 10px;">Accept Invite</a>`
-          );
-
-          transporter.sendMail(mailOptions, (error, info) => {
-            if (error) {
-              console.log('🔴', error.message);
-            } else {
-              console.log('✅ Email send');
-            }
-          });
-          return { status: 200, data: 'Invite sent' };
-        }
-        return { status: 400, data: 'invitation failed' };
-      }
-      return { status: 404, data: 'workspace not found' };
+    if (payment) {
+      return { status: 200, data: payment };
     }
-    return { status: 404, data: 'recipient not found' };
   } catch (error) {
-    console.log(error);
-    return { status: 400, data: 'Oops! something went wrong' };
+    return { status: 400 };
+  }
+};
+
+export const enableFirstView = async (state: boolean) => {
+  try {
+    const user = await currentUser();
+
+    if (!user) return { status: 404 };
+
+    const view = await client.user.update({
+      where: {
+        clerkid: user.id,
+      },
+      data: {
+        firstView: state,
+      },
+    });
+
+    if (view) {
+      return { status: 200, data: 'Setting updated' };
+    }
+  } catch (error) {
+    return { status: 400 };
+  }
+};
+
+export const getFirstView = async () => {
+  try {
+    const user = await currentUser();
+    if (!user) return { status: 404 };
+    const userData = await client.user.findUnique({
+      where: {
+        clerkid: user.id,
+      },
+      select: {
+        firstView: true,
+      },
+    });
+    if (userData) {
+      return { status: 200, data: userData.firstView };
+    }
+    return { status: 400, data: false };
+  } catch (error) {
+    return { status: 400 };
   }
 };
 
@@ -348,70 +322,83 @@ export const getVideoComments = async (Id: string) => {
   }
 };
 
-export const getPaymentInfo = async () => {
+export const inviteMembers = async (
+  workspaceId: string,
+  recieverId: string,
+  email: string
+) => {
   try {
     const user = await currentUser();
     if (!user) return { status: 404 };
-
-    const payment = await client.user.findUnique({
+    const senderInfo = await client.user.findUnique({
       where: {
         clerkid: user.id,
       },
       select: {
-        subscription: {
-          select: { plan: true },
+        id: true,
+        firstname: true,
+        lastname: true,
+      },
+    });
+    if (senderInfo?.id) {
+      const workspace = await client.workSpace.findUnique({
+        where: {
+          id: workspaceId,
         },
-      },
-    });
-    if (payment) {
-      return { status: 200, data: payment };
+        select: {
+          name: true,
+        },
+      });
+      if (workspace) {
+        const invitation = await client.invite.create({
+          data: {
+            senderId: senderInfo.id,
+            recieverId,
+            workSpaceId: workspaceId,
+            content: `You are invited to join ${workspace.name} Workspace, click accept to confirm`,
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        await client.user.update({
+          where: {
+            clerkid: user.id,
+          },
+          data: {
+            notification: {
+              create: {
+                content: `${user.firstName} ${user.lastName} invited ${senderInfo.firstname} into ${workspace.name}`,
+              },
+            },
+          },
+        });
+        if (invitation) {
+          const { transporter, mailOptions } = await sendEmail(
+            email,
+            'You got an invitation',
+            'You are invited to join ${workspace.name} Workspace, click accept to confirm',
+            `<a href="${process.env.NEXT_PUBLIC_HOST_URL}/invite/${invitation.id}" style="background-color: #000; padding: 5px 10px; border-radius: 10px;">Accept Invite</a>`
+          );
+
+          transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+              console.log('🔴', error.message);
+            } else {
+              console.log('✅ Email send');
+            }
+          });
+          return { status: 200, data: 'Invite sent' };
+        }
+        return { status: 400, data: 'invitation failed' };
+      }
+      return { status: 404, data: 'workspace not found' };
     }
+    return { status: 404, data: 'recipient not found' };
   } catch (error) {
-    return { status: 400 };
-  }
-};
-
-export const getFirstView = async () => {
-  try {
-    const user = await currentUser();
-    if (!user) return { status: 404 };
-    const userData = await client.user.findUnique({
-      where: {
-        clerkid: user.id,
-      },
-      select: {
-        firstView: true,
-      },
-    });
-    if (userData) {
-      return { status: 200, data: userData.firstView };
-    }
-    return { status: 400, data: false };
-  } catch (error) {
-    return { status: 400 };
-  }
-};
-
-export const enableFirstView = async (state: boolean) => {
-  try {
-    const user = await currentUser();
-
-    if (!user) return { status: 404 };
-
-    const view = await client.user.update({
-      where: {
-        clerkid: user.id,
-      },
-      data: {
-        firstView: state,
-      },
-    });
-
-    if (view) {
-      return { status: 200, data: 'Setting updated' };
-    }
-  } catch (error) {
-    return { status: 400 };
+    console.log(error);
+    return { status: 400, data: 'Oops! something went wrong' };
   }
 };
 
@@ -468,6 +455,38 @@ export const acceptInvite = async (inviteId: string) => {
       return { status: 200 };
     }
     return { status: 400 };
+  } catch (error) {
+    return { status: 400 };
+  }
+};
+
+export const completeSubscription = async (session_id: string) => {
+  try {
+    const user = await currentUser();
+    if (!user) return { status: 404 };
+
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    if (session) {
+      const customer = await client.user.update({
+        where: {
+          clerkid: user.id,
+        },
+        data: {
+          subscription: {
+            update: {
+              data: {
+                customerId: session.customer as string,
+                plan: 'PRO',
+              },
+            },
+          },
+        },
+      });
+      if (customer) {
+        return { status: 200 };
+      }
+    }
+    return { status: 404 };
   } catch (error) {
     return { status: 400 };
   }
