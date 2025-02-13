@@ -25,11 +25,11 @@ import { useQueryData } from '@/hooks/useQueryData'
 import WorkspacePlaceholder from './workspace-placeholder'
 import GlobalCard from '../global-card'
 import { Button } from '@/components/ui/button'
-// import Loader from '../loader'
+// import Loader from '../loader's
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import InfoBar from '../info-bar'
-// import { useDispatch } from 'react-redux'
-// import { WORKSPACES } from '@/redux/slices/workspaces'
+import { useDispatch } from 'react-redux'
+import { WORKSPACES } from '@/redux/slices/workspaces'
 import PaymentButton from '../payment-button'
 type Props = {
     activeWorkspaceId: string
@@ -39,7 +39,7 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
 
     const router = useRouter()
     const pathName = usePathname()
-    // const dispatch = useDispatch()
+    const dispatch = useDispatch()
 
     const { data, isFetched } = useQueryData(['user-workspaces'], getWorkSpaces)
     const menuItems = MENU_ITEMS(activeWorkspaceId)
@@ -59,9 +59,9 @@ const Sidebar = ({ activeWorkspaceId }: Props) => {
         (s) => s.id === activeWorkspaceId
     )
 
-    // if (isFetched && workspace) {
-    //     dispatch(WORKSPACES({ workspaces: workspace.workspace }))
-    // }
+    if (isFetched && workspace) {
+        dispatch(WORKSPACES({ workspaces: workspace.workspace }))
+    }
 
     const SidebarSection = (
         <div className="bg-[#111111] flex-none relative p-4 h-full w-[250px] flex flex-col gap-4 items-center overflow-hidden">
