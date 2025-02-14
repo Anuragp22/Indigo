@@ -3,9 +3,9 @@
 import { client } from '@/lib/prisma';
 import { currentUser } from '@clerk/nextjs/server';
 import nodemailer from 'nodemailer';
-import Stripe from 'stripe';
+// import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_CLIENT_SECRET as string);
+// const stripe = new Stripe(process.env.STRIPE_CLIENT_SECRET as string);
 
 export const sendEmail = async (
   to: string,
@@ -124,6 +124,7 @@ export const getNotifications = async () => {
       return { status: 200, data: notifications };
     return { status: 404, data: [] };
   } catch (error) {
+    console.error('Notification error:', error);
     return { status: 400, data: [] };
   }
 };
@@ -162,6 +163,7 @@ export const searchUsers = async (query: string) => {
 
     return { status: 404, data: undefined };
   } catch (error) {
+    console.error('Search error:', error);
     return { status: 500, data: undefined };
   }
 };
@@ -185,6 +187,7 @@ export const getPaymentInfo = async () => {
       return { status: 200, data: payment };
     }
   } catch (error) {
+    console.error('Payment info error:', error);
     return { status: 400 };
   }
 };
@@ -208,6 +211,7 @@ export const enableFirstView = async (state: boolean) => {
       return { status: 200, data: 'Setting updated' };
     }
   } catch (error) {
+    console.error('First view error:', error);
     return { status: 400 };
   }
 };
@@ -229,6 +233,7 @@ export const getFirstView = async () => {
     }
     return { status: 400, data: false };
   } catch (error) {
+    console.error('Get first view error:', error);
     return { status: 400 };
   }
 };
@@ -275,6 +280,7 @@ export const createCommentAndReply = async (
     });
     if (newComment) return { status: 200, data: 'New comment added' };
   } catch (error) {
+    console.error('Comment error:', error);
     return { status: 400 };
   }
 };
@@ -295,6 +301,7 @@ export const getUserProfile = async () => {
 
     if (profileIdAndImage) return { status: 200, data: profileIdAndImage };
   } catch (error) {
+    console.error('Profile error:', error);
     return { status: 400 };
   }
 };
@@ -318,6 +325,7 @@ export const getVideoComments = async (Id: string) => {
 
     return { status: 200, data: comments };
   } catch (error) {
+    console.error('Video comments error:', error);
     return { status: 400 };
   }
 };
@@ -382,11 +390,11 @@ export const inviteMembers = async (
             `<a href="${process.env.NEXT_PUBLIC_HOST_URL}/invite/${invitation.id}" style="background-color: #000; padding: 5px 10px; border-radius: 10px;">Accept Invite</a>`
           );
 
-          transporter.sendMail(mailOptions, (error, info) => {
+          transporter.sendMail(mailOptions, (error) => {
             if (error) {
               console.log('🔴', error.message);
             } else {
-              console.log('✅ Email send');
+              console.log('✅ Email sent');
             }
           });
           return { status: 200, data: 'Invite sent' };
@@ -456,38 +464,40 @@ export const acceptInvite = async (inviteId: string) => {
     }
     return { status: 400 };
   } catch (error) {
+    console.error('Accept invite error:', error);
     return { status: 400 };
   }
 };
 
-export const completeSubscription = async (session_id: string) => {
-  try {
-    const user = await currentUser();
-    if (!user) return { status: 404 };
+// export const completeSubscription = async (session_id: string) => {
+//   try {
+//     const user = await currentUser();
+//     if (!user) return { status: 404 };
 
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    if (session) {
-      const customer = await client.user.update({
-        where: {
-          clerkid: user.id,
-        },
-        data: {
-          subscription: {
-            update: {
-              data: {
-                customerId: session.customer as string,
-                plan: 'PRO',
-              },
-            },
-          },
-        },
-      });
-      if (customer) {
-        return { status: 200 };
-      }
-    }
-    return { status: 404 };
-  } catch (error) {
-    return { status: 400 };
-  }
-};
+//     const session = await stripe.checkout.sessions.retrieve(session_id);
+//     if (session) {
+//       const customer = await client.user.update({
+//         where: {
+//           clerkid: user.id,
+//         },
+//         data: {
+//           subscription: {
+//             update: {
+//               data: {
+//                 customerId: session.customer as string,
+//                 plan: 'PRO',
+//               },
+//             },
+//           },
+//         },
+//       });
+//       if (customer) {
+//         return { status: 200 };
+//       }
+//     }
+//     return { status: 404 };
+//   } catch (error) {
+//     console.error('Subscription error:', error);
+//     return { status: 400 };
+//   }
+// };
