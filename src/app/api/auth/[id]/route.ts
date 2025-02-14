@@ -4,11 +4,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   req: NextRequest,
-  { params: { id } }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
+  const { id } = context.params;
   console.log('Endpoint hit ✅');
 
   try {
+    // Look up the user in your database by their clerk id.
     const userProfile = await client.user.findUnique({
       where: {
         clerkid: id,
@@ -27,7 +29,7 @@ export async function GET(
       return NextResponse.json({ status: 200, user: userProfile });
     }
 
-    // Await the clerkClient to get the actual client instance.
+    // Use the clerkClient to fetch the user if not found in your DB.
     const clerk = await clerkClient();
     const clerkUserInstance = await clerk.users.getUser(id);
 
@@ -66,7 +68,7 @@ export async function GET(
 
     return NextResponse.json({ status: 400 });
   } catch (error) {
-    console.log('ERROR', error);
+    console.error('ERROR', error);
     return NextResponse.json({ status: 500, error: 'Internal Server Error' });
   }
 }
